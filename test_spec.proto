@@ -1,0 +1,16 @@
+syntax = "proto3";
+option go_package = "./compiled";
+
+package test_spec.v1;
+
+message TestRequest {
+  string foo = 1;
+}
+
+message TestResponse {
+  string bar = 1;
+}
+
+service TestService {
+    rpc TestMethod(TestRequest) returns (TestResponse) {}
+}
