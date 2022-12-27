@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"fmt"
 	"time"
 
 	"github.com/fullstorydev/grpcurl"
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/grpcreflect"
 	"github.com/profx5/jordi/internal/version"
@@ -15,6 +17,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type (
@@ -59,9 +62,31 @@ func New(ctx context.Context, target string, connOpts Opts) (*GRPCWrapper, error
 	opts = append(opts, grpc.WithUserAgent(userAgent))
 
 	network := "tcp"
-	cc, err := grpcurl.BlockingDial(ctx, network, target, creds, opts...)
-	if err != nil {
-		return nil, err
+
+	type res struct {
+		cc  *grpc.ClientConn
+		err error
+	}
+	ch := make(chan res)
+	go func() {
+		cc, err := grpcurl.BlockingDial(ctx, network, target, creds, opts...)
+		if err != nil {
+			ch <- res{err: err}
+			return
+		}
+		ch <- res{cc: cc}
+	}()
+	var cc *grpc.ClientConn
+	timeoutCtx, cancel := context.WithTimeout(ctx, connOpts.ConnectTimeout)
+	defer cancel()
+	select {
+	case <-timeoutCtx.Done():
+		return nil, fmt.Errorf("connection timed out")
+	case r := <-ch:
+		if r.err != nil {
+			return nil, r.err
+		}
+		cc = r.cc
 	}
 	refClient := grpcreflect.NewClientV1Alpha(ctx, reflectpb.NewServerReflectionClient(cc))
 	descSource := grpcurl.DescriptorSourceFromServer(ctx, refClient)
@@ -80,6 +105,14 @@ func (g *GRPCWrapper) ListMethods(service string) ([]string, error) {
 	return grpcurl.ListMethods(g.descSource, service)
 }
 
+type MessageWrapper struct {
+	Msg protoreflect.Message
+}
+
+func (mw MessageWrapper) ProtoReflect() protoreflect.Message {
+	return mw.Msg
+}
+
 func (g *GRPCWrapper) GetInOutDescription(method string) (string, string, error) {
 	dsc, err := g.descSource.FindSymbol(method)
 	if err != nil {
@@ -89,15 +122,21 @@ func (g *GRPCWrapper) GetInOutDescription(method string) (string, string, error)
 	if !ok {
 		panic("not a method")
 	}
-	in, err := grpcurl.GetDescriptorText(methodDsc.GetInputType(), nil)
+	inType := methodDsc.GetInputType()
+	in, err := grpcurl.GetDescriptorText(inType, g.descSource)
 	if err != nil {
-		panic(err)
+		return "", "", err
 	}
-	out, err := grpcurl.GetDescriptorText(methodDsc.GetOutputType(), nil)
+	protoMsg := grpcurl.MakeTemplate(inType)
+	example, err := (&jsonpb.Marshaler{
+		EmitDefaults: true,
+		Indent:       "  ",
+	}).MarshalToString(protoMsg)
 	if err != nil {
-		panic(err)
+		example = "{}"
 	}
-	return in, out, nil
+
+	return in, example, nil
 }
 
 func (g *GRPCWrapper) Invoke(method string, request string) (string, error) {

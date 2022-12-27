@@ -15,9 +15,14 @@ milestones:
 - [x] Methods list
 - [x] Request editor
 - [x] Response viewer
-- [ ] Messages description
-- [ ] Response errors
+- [x] Request example
+- [x] Messages description
+- [x] Status bar
+- [ ] Response status
 - [ ] Request headers
 - [ ] Response headers
-- [ ] Status bar
 - [ ] JSON editor
+- [ ] File proto input
+- [x] Secure/unsecure connection
+- [ ] Store/load last successful request
+- [ ] Handle long requests

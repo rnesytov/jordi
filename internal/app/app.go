@@ -18,13 +18,15 @@ func New(config config.Config) *App {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	gw, err := grpc.New(ctx, a.config.Target, grpc.DefaultOpts())
+	opts := grpc.DefaultOpts()
+	opts.Insecure = a.config.Insecure
+	gw, err := grpc.New(ctx, a.config.Target, opts)
 	if err != nil {
 		return err
 	}
 	defer gw.Close()
 
-	root := tui.NewRoot(gw)
+	root := tui.NewRoot(a.config, gw)
 
 	p := tea.NewProgram(root, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {

@@ -1,6 +1,7 @@
 package tui
 
 type (
+	Back             struct{}
 	ShowServicesList struct {
 		Services []string
 	}
@@ -17,13 +18,18 @@ type (
 	Err struct {
 		Error error
 	}
-	ShowStatus struct {
+	SetStatus struct {
 		Status string
 	}
-	ShowRequester struct {
-		Method         string
-		InDescription  string
-		OutDescription string
+	SetStatusMsg struct {
+		Type StatusMsgType
+		Msg  string
+	}
+	ClearStatusMsg struct{}
+	ShowRequester  struct {
+		Method        string
+		InDescription string
+		InExample     string
 	}
 	ShowResponse struct {
 		Response string

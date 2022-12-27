@@ -55,12 +55,12 @@ func (m *ServicesListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keyMap.Enter) {
-			return m, m.commands.LoadMethods(m.view.SelectedItem().(MethodsListItem).Name)
+			return m, m.commands.LoadMethods(m.view.SelectedItem().(ServicesListItem).Name)
 		}
 	case ShowServicesList:
 		items := []list.Item{}
 		for _, service := range msg.Services {
-			items = append(items, MethodsListItem{Name: service})
+			items = append(items, ServicesListItem{Name: service})
 		}
 		cmds = append(cmds, m.view.SetItems(items))
 	}

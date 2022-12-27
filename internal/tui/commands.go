@@ -35,14 +35,14 @@ func (c *Commands) LoadMethods(service string) tea.Cmd {
 
 func (c *Commands) ShowRequester(method string) tea.Cmd {
 	return func() tea.Msg {
-		in, out, err := c.grpc.GetInOutDescription(method)
+		in, inExample, err := c.grpc.GetInOutDescription(method)
 		if err != nil {
 			return Err{Error: err}
 		}
 		return ShowRequester{
-			Method:         method,
-			InDescription:  in,
-			OutDescription: out,
+			Method:        method,
+			InDescription: in,
+			InExample:     inExample,
 		}
 	}
 }
@@ -54,5 +54,11 @@ func (c *Commands) SendRequest(method string, in string) tea.Cmd {
 			return Err{Error: err}
 		}
 		return ShowResponse{Response: resp}
+	}
+}
+
+func (c *Commands) SetStatus(status string) tea.Cmd {
+	return func() tea.Msg {
+		return SetStatus{Status: status}
 	}
 }

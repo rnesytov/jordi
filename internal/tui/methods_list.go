@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -13,7 +14,8 @@ type (
 		Enter key.Binding
 	}
 	MethodsListItem struct {
-		Name string
+		Name      string
+		ShortName string
 	}
 	MethodsListView struct {
 		keyMap   MethodsListKeyMap
@@ -22,12 +24,20 @@ type (
 	}
 )
 
+func NewMethodsListItem(name string) MethodsListItem {
+	splatName := strings.Split(name, ".")
+	return MethodsListItem{
+		Name:      name,
+		ShortName: splatName[len(splatName)-1],
+	}
+}
+
 func (i MethodsListItem) FilterValue() string {
-	return i.Name
+	return i.ShortName
 }
 
 func (i MethodsListItem) Title() string {
-	return i.Name
+	return i.ShortName
 }
 
 func (i MethodsListItem) Description() string {
@@ -62,7 +72,7 @@ func (m *MethodsListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ShowMethodsList:
 		items := []list.Item{}
 		for _, methods := range msg.Methods {
-			items = append(items, MethodsListItem{Name: methods})
+			items = append(items, NewMethodsListItem(methods))
 		}
 		m.view.SetItems(items)
 		m.view.Title = fmt.Sprintf("Methods %s", msg.Service)

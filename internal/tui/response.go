@@ -26,6 +26,14 @@ func (r *ResponseView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case ShowResponse:
 		r.view.SetContent(msg.Response)
+		cmds = append(cmds, func() tea.Msg {
+			return SetStatusMsg{Msg: "OK", Type: StatusMsgSuccess}
+		})
+	case Back:
+		r.view.SetContent("")
+		cmds = append(cmds, func() tea.Msg {
+			return ClearStatusMsg{}
+		})
 	}
 	var cmd tea.Cmd
 	r.view, cmd = r.view.Update(msg)
