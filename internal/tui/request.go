@@ -131,15 +131,6 @@ func (r *RequestView) View() string {
 
 	views := []string{r.inputView.View()}
 	if r.showDesc {
-		// md := fmt.Sprintf("```protobuf\n%s", r.inDesc)
-		// renderer, _ := glamour.NewTermRenderer(
-		// 	glamour.WithAutoStyle(),
-		// 	glamour.WithWordWrap(r.width),
-		// )
-		// gl, err := renderer.Render(md)
-		// if err != nil {
-		// 	gl = r.inDesc
-		// }
 		views = append(views, descriptionStyle.Render(r.inDesc))
 	}
 	views = append(views, helpStyle.Render(r.help.ShortHelpView(r.keyMap.Bindings())))

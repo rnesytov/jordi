@@ -123,19 +123,19 @@ func (m *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if key.Matches(msg, m.keyMap.Back) {
+			cmds = append(cmds, m.UpdateCurrentView(Back{}))
 			switch m.currentView {
 			case Services:
 				return m, tea.Quit
 			case Methods:
 				m.currentView = Services
 			case Request:
+				// exit if we have been called with a method
 				if m.initMethod != "" {
 					return m, tea.Quit
 				}
 				m.currentView = Methods
 			case Response:
-				_, cmd := m.CurrentView().Update(Back{})
-				cmds = append(cmds, cmd)
 				m.currentView = Request
 			}
 			return m, tea.Batch(cmds...)
