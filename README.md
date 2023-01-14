@@ -12,11 +12,12 @@ milestones:
 - [x] Messages description
 - [x] Status bar
 - [x] Secure/unsecure connection
-- [ ] Response status
+- [x] Response status
+- [x] Resend request in response view
+- [x] Nice titles for request/response
+- [x] Handle invalid JSON
 - [ ] Response headers
 - [ ] Handle long requests
-- [ ] Handle invalid JSON
 - [ ] Store/load last successful request
-- [ ] JSON editor
 - [ ] Request headers
 - [ ] File proto input

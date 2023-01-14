@@ -20,15 +20,15 @@ func New(config config.Config) *App {
 func (a *App) Run(ctx context.Context) error {
 	opts := grpc.DefaultOpts()
 	opts.Insecure = a.config.Insecure
-	gw, err := grpc.New(ctx, a.config.Target, opts)
+	grpcWrapper, err := grpc.New(ctx, a.config.Target, opts)
 	if err != nil {
 		return err
 	}
-	defer gw.Close()
+	defer grpcWrapper.Close()
 
-	root := tui.NewRoot(a.config, gw)
+	root := tui.NewRoot(a.config, grpcWrapper)
 
-	p := tea.NewProgram(root, tea.WithAltScreen())
+	p := tea.NewProgram(root, tea.WithAltScreen(), tea.WithContext(ctx))
 	if _, err := p.Run(); err != nil {
 		return err
 	}

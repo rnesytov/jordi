@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -25,10 +24,9 @@ type (
 )
 
 func NewMethodsListItem(name string) MethodsListItem {
-	splatName := strings.Split(name, ".")
 	return MethodsListItem{
 		Name:      name,
-		ShortName: splatName[len(splatName)-1],
+		ShortName: getShortMethodName(name),
 	}
 }
 

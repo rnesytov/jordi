@@ -1,5 +1,7 @@
 package tui
 
+import tea "github.com/charmbracelet/bubbletea"
+
 type (
 	Back             struct{}
 	ShowServicesList struct {
@@ -20,8 +22,9 @@ type (
 	}
 	SetStatus struct {
 		Status string
+		Type   StatusType
 	}
-	SetStatusMsg struct {
+	SetStatusMessage struct {
 		Type StatusMsgType
 		Msg  string
 	}
@@ -31,7 +34,17 @@ type (
 		InDescription string
 		InExample     string
 	}
-	ShowResponse struct {
+	ShowResponseView struct {
+		ch <-chan tea.Msg
+	}
+	ReceivedResponse struct {
+		ch       <-chan tea.Msg
 		Response string
+	}
+	ReceivedStatus struct {
+		ch     <-chan tea.Msg
+		Status string
+	}
+	ResendRequest struct {
 	}
 )

@@ -2,21 +2,14 @@ package tui
 
 import (
 	"encoding/json"
-	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-const (
-	requestHelpHeight = 1
-)
-
 var (
-	helpStyle        = lipgloss.NewStyle().PaddingLeft(2)
 	descriptionStyle = lipgloss.NewStyle().PaddingLeft(2).Border(lipgloss.NormalBorder(), true, false)
 )
 
@@ -31,7 +24,8 @@ type (
 		commands    *Commands
 		inputView   textarea.Model
 		requestDesc string
-		help        help.Model
+		title       TitleView
+		help        HelpView
 
 		method string
 		inDesc string
@@ -41,7 +35,7 @@ type (
 	}
 )
 
-func (r *RequestKeyMap) Bindings() []key.Binding {
+func (r RequestKeyMap) Bindings() []key.Binding {
 	return []key.Binding{
 		r.Send,
 		r.Format,
@@ -49,7 +43,7 @@ func (r *RequestKeyMap) Bindings() []key.Binding {
 	}
 }
 
-func DefaultKeyMap() RequestKeyMap {
+func DefaultRequestKeyMap() RequestKeyMap {
 	send := key.NewBinding(key.WithKeys("ctrl+s"))
 	send.SetHelp(`ctrl+s`, "send")
 
@@ -71,12 +65,20 @@ func NewRequesterView(commands *Commands) *RequestView {
 	inputView.ShowLineNumbers = false
 	inputView.Prompt = ""
 
+	keyMap := DefaultRequestKeyMap()
+
 	return &RequestView{
-		keyMap:      DefaultKeyMap(),
+		keyMap:      keyMap,
 		commands:    commands,
 		inputView:   inputView,
 		requestDesc: "",
-		help:        help.New(),
+		title:       NewTitleView("Request"),
+		help:        NewHelpView(keyMap),
+		method:      "",
+		inDesc:      "",
+		showDesc:    false,
+		height:      0,
+		width:       0,
 	}
 }
 
@@ -103,12 +105,12 @@ func (r *RequestView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if key.Matches(msg, r.keyMap.Send) {
 			return r, r.commands.SendRequest(r.method, r.inputView.Value())
-		}
-		if key.Matches(msg, r.keyMap.Format) {
+		} else if key.Matches(msg, r.keyMap.Format) {
 			r.FormatInput()
-		}
-		if key.Matches(msg, r.keyMap.ToggleDesc) && r.inDesc != "" {
+		} else if key.Matches(msg, r.keyMap.ToggleDesc) && r.inDesc != "" {
 			r.showDesc = !r.showDesc
+		} else {
+			cmds = append(cmds, r.commands.ClearStatusMsg())
 		}
 	case ShowRequester:
 		r.method = msg.Method
@@ -118,7 +120,12 @@ func (r *RequestView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		r.inputView.SetValue(msg.InExample)
 		r.inputView.SetCursor(1)
 		r.inputView.Focus()
+
+		r.title.SetTitle(getShortMethodName(msg.Method))
+	case ResendRequest:
+		return r, r.commands.SendRequest(r.method, r.inputView.Value())
 	}
+
 	updInput, cmd := r.inputView.Update(msg)
 	r.inputView = updInput
 	cmds = append(cmds, cmd)
@@ -129,11 +136,11 @@ func (r *RequestView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (r *RequestView) View() string {
 	r.SyncSize()
 
-	views := []string{r.inputView.View()}
+	views := []string{r.title.View(), r.inputView.View()}
 	if r.showDesc {
 		views = append(views, descriptionStyle.Render(r.inDesc))
 	}
-	views = append(views, helpStyle.Render(r.help.ShortHelpView(r.keyMap.Bindings())))
+	views = append(views, r.help.View())
 
 	return lipgloss.JoinVertical(lipgloss.Left, views...)
 }
@@ -143,15 +150,11 @@ func (r *RequestView) HandleWindowSize(msg tea.WindowSizeMsg) {
 }
 
 func (r *RequestView) SyncSize() {
-	r.inputView.SetHeight(r.height - requestHelpHeight)
+	r.inputView.SetHeight(r.height - helpHeight - titleHeight)
 	r.inputView.SetWidth(r.width)
-	r.help.Width = r.width
+	r.help.SetWidth(r.width)
 
 	if r.showDesc {
-		r.inputView.SetHeight(r.height - requestHelpHeight - CountNewLines(r.inDesc) - 3)
+		r.inputView.SetHeight(r.height - helpHeight - countLines(r.inDesc) - 3)
 	}
-}
-
-func CountNewLines(s string) int {
-	return strings.Count(s, "\n")
 }

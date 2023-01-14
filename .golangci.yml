@@ -1,0 +1,27 @@
+issues:
+  exclude-use-default: true
+  max-same-issues: 0
+  max-issues-per-linter: 0
+
+  exclude-rules:
+  - linters:
+      - staticcheck
+    text: "SA1019:"
+
+linters:
+  enable:
+    - dupl
+    - errname
+    - gofmt
+    - goimports
+    - misspell
+    - revive
+    - varnamelen
+    - stylecheck
+    - unconvert
+
+output:
+  uniq-by-line: false
+
+run:
+  timeout: 5m

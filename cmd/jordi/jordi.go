@@ -55,7 +55,10 @@ func fail(err error, msg string, args ...interface{}) {
 
 func main() {
 	flags.Usage = usage
-	flags.Parse(os.Args[1:])
+	err := flags.Parse(os.Args[1:])
+	if err != nil {
+		fail(err, "Failed to parse flags")
+	}
 
 	if *help {
 		usage()

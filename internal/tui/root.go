@@ -39,7 +39,7 @@ type (
 	}
 )
 
-func NewRoot(config config.Config, grpc *grpc.GRPCWrapper) *Root {
+func NewRoot(config config.Config, grpc *grpc.Wrapper) *Root {
 	commands := NewCommands(grpc)
 	return &Root{
 		initMethod: config.Method,
@@ -52,7 +52,7 @@ func NewRoot(config config.Config, grpc *grpc.GRPCWrapper) *Root {
 		servicesListView: NewServicesListView(commands),
 		methodsListView:  NewMethodsListView(commands),
 		requestView:      NewRequesterView(commands),
-		responseView:     NewResponseView(),
+		responseView:     NewResponseView(commands),
 		statusView:       NewStatusView(),
 	}
 }
@@ -65,7 +65,7 @@ func (m *Root) Init() tea.Cmd {
 	} else {
 		cmds = append(cmds, m.commands.LoadServices())
 	}
-	cmds = append(cmds, m.commands.SetStatus("Ready"))
+	cmds = append(cmds, m.commands.SetStatus("Ready", StatusTypeOK))
 	return tea.Batch(cmds...)
 }
 
@@ -108,7 +108,7 @@ func (m *Root) UpdateCurrentView(msg tea.Msg) tea.Cmd {
 func (m *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{}
 	switch msg := msg.(type) {
-	case SetStatus, SetStatusMsg, ClearStatusMsg:
+	case SetStatus, SetStatusMessage, ClearStatusMsg:
 		m.statusView.Update(msg)
 	case ShowServicesList:
 		m.currentView = Services
@@ -116,8 +116,10 @@ func (m *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.currentView = Methods
 	case ShowRequester:
 		m.currentView = Request
-	case ShowResponse:
+	case ShowResponseView:
 		m.currentView = Response
+	case ResendRequest:
+		m.currentView = Request
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keyMap.ForceQuit) {
 			return m, tea.Quit
@@ -148,7 +150,7 @@ func (m *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.responseView.HandleWindowSize(msg)
 		m.statusView.HandleWindowSize(msg)
 	case Err:
-		panic(msg.Error)
+		cmds = append(cmds, m.commands.SetStatusMessage(msg.Error.Error(), StatusMsgError))
 	}
 	cmds = append(cmds, m.UpdateCurrentView(msg))
 	return m, tea.Batch(cmds...)

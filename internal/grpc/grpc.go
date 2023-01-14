@@ -9,6 +9,7 @@ import (
 
 	"github.com/fullstorydev/grpcurl"
 	"github.com/golang/protobuf/jsonpb"
+	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/grpcreflect"
 	"github.com/profx5/jordi/internal/version"
@@ -16,7 +17,9 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -27,20 +30,58 @@ type (
 		MaxMsgSize     int
 		Insecure       bool
 	}
-	GRPCWrapper struct {
+	Wrapper struct {
 		cc         *grpc.ClientConn
 		refClient  *grpcreflect.Client
 		descSource grpcurl.DescriptorSource
+	}
+	TypeAndError[T any] struct {
+		Result T
+		Err    error
+	}
+	InDesc struct {
+		Desc    string
+		Example string
+		Err     error
+	}
+	gRPCEventType int
+	Event         struct {
+		Type    gRPCEventType
+		Payload interface{}
+		Err     error
+	}
+	gRPCEventHandler struct {
+		c      chan<- Event
+		cancel func()
+	}
+)
+
+const (
+	GRPCEventTypeUnknown gRPCEventType = iota
+	MethodResolved       gRPCEventType = iota
+	HeadersSent          gRPCEventType = iota
+	HeadersReceived      gRPCEventType = iota
+	ResponseReceived     gRPCEventType = iota
+	ReceivedTrailers     gRPCEventType = iota
+	EventError           gRPCEventType = iota
+
+	requestTimeout = 10 * time.Second // TODO: make this configurable
+)
+
+var (
+	ProtoJSONMarshaler = &jsonpb.Marshaler{
+		EmitDefaults: true,
+		Indent:       "  ",
 	}
 )
 
 func DefaultOpts() Opts {
 	return Opts{
-		ConnectTimeout: 10 * time.Second,
+		ConnectTimeout: 10 * time.Second, // TODO: make this configurable
 	}
 }
 
-func New(ctx context.Context, target string, connOpts Opts) (*GRPCWrapper, error) {
+func New(ctx context.Context, target string, connOpts Opts) (*Wrapper, error) {
 	var opts []grpc.DialOption
 	if connOpts.KeepaliveTime > 0 {
 		opts = append(opts, grpc.WithKeepaliveParams(keepalive.ClientParameters{
@@ -64,45 +105,57 @@ func New(ctx context.Context, target string, connOpts Opts) (*GRPCWrapper, error
 	network := "tcp"
 
 	type res struct {
-		cc  *grpc.ClientConn
-		err error
+		clientConn *grpc.ClientConn
+		err        error
 	}
-	ch := make(chan res)
+	resultChan := make(chan res)
 	go func() {
 		cc, err := grpcurl.BlockingDial(ctx, network, target, creds, opts...)
 		if err != nil {
-			ch <- res{err: err}
+			resultChan <- res{err: err}
 			return
 		}
-		ch <- res{cc: cc}
+		resultChan <- res{clientConn: cc}
 	}()
-	var cc *grpc.ClientConn
+	var clientConn *grpc.ClientConn
 	timeoutCtx, cancel := context.WithTimeout(ctx, connOpts.ConnectTimeout)
 	defer cancel()
 	select {
 	case <-timeoutCtx.Done():
 		return nil, fmt.Errorf("connection timed out")
-	case r := <-ch:
+	case r := <-resultChan:
 		if r.err != nil {
 			return nil, r.err
 		}
-		cc = r.cc
+		clientConn = r.clientConn
 	}
-	refClient := grpcreflect.NewClientV1Alpha(ctx, reflectpb.NewServerReflectionClient(cc))
+	refClient := grpcreflect.NewClientV1Alpha(ctx, reflectpb.NewServerReflectionClient(clientConn))
 	descSource := grpcurl.DescriptorSourceFromServer(ctx, refClient)
-	return &GRPCWrapper{
-		cc:         cc,
+	return &Wrapper{
+		cc:         clientConn,
 		refClient:  refClient,
 		descSource: descSource,
 	}, nil
 }
 
-func (g *GRPCWrapper) ListServices() ([]string, error) {
-	return grpcurl.ListServices(g.descSource)
+func (g *Wrapper) ListServices() <-chan TypeAndError[[]string] {
+	resultChan := make(chan TypeAndError[[]string])
+	go func() {
+		defer close(resultChan)
+		services, err := grpcurl.ListServices(g.descSource)
+		resultChan <- TypeAndError[[]string]{Result: services, Err: err}
+	}()
+	return resultChan
 }
 
-func (g *GRPCWrapper) ListMethods(service string) ([]string, error) {
-	return grpcurl.ListMethods(g.descSource, service)
+func (g *Wrapper) ListMethods(service string) <-chan TypeAndError[[]string] {
+	resultChan := make(chan TypeAndError[[]string])
+	go func() {
+		defer close(resultChan)
+		methods, err := grpcurl.ListMethods(g.descSource, service)
+		resultChan <- TypeAndError[[]string]{Result: methods, Err: err}
+	}()
+	return resultChan
 }
 
 type MessageWrapper struct {
@@ -113,57 +166,85 @@ func (mw MessageWrapper) ProtoReflect() protoreflect.Message {
 	return mw.Msg
 }
 
-func (g *GRPCWrapper) GetInOutDescription(method string) (string, string, error) {
+func (g *Wrapper) getInDescription(method string) (string, string, error) {
 	dsc, err := g.descSource.FindSymbol(method)
 	if err != nil {
 		return "", "", err
 	}
 	methodDsc, ok := dsc.(*desc.MethodDescriptor)
 	if !ok {
-		panic("not a method")
+		return "", "", fmt.Errorf("not a method")
 	}
 	inType := methodDsc.GetInputType()
-	in, err := grpcurl.GetDescriptorText(inType, g.descSource)
+	inDescText, err := grpcurl.GetDescriptorText(inType, g.descSource)
 	if err != nil {
 		return "", "", err
 	}
 	protoMsg := grpcurl.MakeTemplate(inType)
-	example, err := (&jsonpb.Marshaler{
-		EmitDefaults: true,
-		Indent:       "  ",
-	}).MarshalToString(protoMsg)
+	example, err := ProtoJSONMarshaler.MarshalToString(protoMsg)
 	if err != nil {
 		example = "{}"
 	}
 
-	return in, example, nil
+	return inDescText, example, nil
 }
 
-func (g *GRPCWrapper) Invoke(method string, request string) (string, error) {
+func (g *Wrapper) GetInputDescription(method string) <-chan InDesc {
+	resultChan := make(chan InDesc)
+	go func() {
+		defer close(resultChan)
+		desc, example, err := g.getInDescription(method)
+		resultChan <- InDesc{Desc: desc, Example: example, Err: err}
+	}()
+	return resultChan
+}
+
+func (g *Wrapper) Invoke(method string, request string) (<-chan Event, error) {
 	options := grpcurl.FormatOptions{
 		EmitJSONDefaultFields: false,
 		IncludeTextSeparator:  false,
 		AllowUnknownFields:    false,
 	}
-	rf, formatter, err := grpcurl.RequestParserAndFormatter(grpcurl.FormatJSON, g.descSource, bytes.NewReader([]byte(request)), options)
+	requestFormatter, _, err := grpcurl.RequestParserAndFormatter(grpcurl.FormatJSON, g.descSource, bytes.NewReader([]byte(request)), options)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	buf := bytes.NewBuffer(nil)
-	h := &grpcurl.DefaultEventHandler{
-		Out:            buf,
-		Formatter:      formatter,
-		VerbosityLevel: 1,
-	}
+	resultChan := make(chan Event, 10)
 
-	err = grpcurl.InvokeRPC(context.Background(), g.descSource, g.cc, method, []string{}, h, rf.Next)
-	if err != nil {
-		return "", err
-	}
-	return buf.String(), nil
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	h := &gRPCEventHandler{c: resultChan, cancel: cancel}
+	go func() {
+		err := grpcurl.InvokeRPC(ctx, g.descSource, g.cc, method, []string{}, h, requestFormatter.Next)
+		if err != nil {
+			resultChan <- Event{Type: EventError, Err: err}
+			cancel()
+			close(resultChan)
+		}
+	}()
+	return resultChan, nil
 }
 
-func (g *GRPCWrapper) Close() {
+func (h *gRPCEventHandler) OnResolveMethod(m *desc.MethodDescriptor) {
+	h.c <- Event{Type: MethodResolved}
+}
+func (h *gRPCEventHandler) OnSendHeaders(metadata.MD) {
+	h.c <- Event{Type: HeadersSent}
+}
+func (h *gRPCEventHandler) OnReceiveHeaders(metadata.MD) {
+	h.c <- Event{Type: HeadersReceived}
+}
+func (h *gRPCEventHandler) OnReceiveResponse(m proto.Message) {
+	responseJSON, err := ProtoJSONMarshaler.MarshalToString(m)
+
+	h.c <- Event{Type: ResponseReceived, Payload: responseJSON, Err: err}
+}
+func (h *gRPCEventHandler) OnReceiveTrailers(s *status.Status, md metadata.MD) {
+	h.c <- Event{Type: ReceivedTrailers, Payload: s.Code().String()}
+	close(h.c)
+	h.cancel()
+}
+
+func (g *Wrapper) Close() {
 	g.refClient.Reset()
 	g.cc.Close()
 }

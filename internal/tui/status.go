@@ -6,10 +6,15 @@ import (
 )
 
 type StatusMsgType int
+type StatusType int
 
 const (
 	StatusMsgError   StatusMsgType = iota
 	StatusMsgSuccess StatusMsgType = iota
+
+	StatusTypeOK    StatusType = iota
+	StatusTypeWarn  StatusType = iota
+	StatusTypeError StatusType = iota
 )
 
 var (
@@ -17,27 +22,29 @@ var (
 	statusBarStyle        = lipgloss.NewStyle().
 				Background(statusBackgorundColor)
 	statusStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#4e9a06")).
-			PaddingLeft(2).
-			PaddingRight(2).
+			Padding(0, 2).
 			Bold(true)
+	statusTypeColorMap = map[StatusType]lipgloss.Color{
+		StatusTypeOK:    lipgloss.Color("#4e9a06"),
+		StatusTypeWarn:  lipgloss.Color("#e69b00"),
+		StatusTypeError: lipgloss.Color("#ff0000"),
+	}
 	msgStylesMap = map[StatusMsgType]lipgloss.Style{
 		StatusMsgSuccess: lipgloss.NewStyle().
 			Background(statusBackgorundColor).
 			Foreground(lipgloss.Color("#16a402")).
-			PaddingLeft(2).
-			PaddingRight(2),
+			Padding(0, 2),
 		StatusMsgError: lipgloss.NewStyle().
 			Background(statusBackgorundColor).
-			Foreground(lipgloss.Color("#cc0000")).
-			PaddingLeft(2).
-			PaddingRight(2),
+			Foreground(lipgloss.Color("#ff0000")).
+			Padding(0, 2),
 	}
 )
 
 type (
 	StatusView struct {
 		currentStatus string
+		statusType    StatusType
 		msg           string
 		statusMsgType StatusMsgType
 
@@ -46,7 +53,13 @@ type (
 )
 
 func NewStatusView() *StatusView {
-	return &StatusView{}
+	return &StatusView{
+		currentStatus: "Ready",
+		statusType:    StatusTypeOK,
+		msg:           "",
+		statusMsgType: StatusMsgSuccess,
+		width:         0,
+	}
 }
 
 func (s *StatusView) Init() tea.Cmd {
@@ -57,7 +70,8 @@ func (s *StatusView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case SetStatus:
 		s.currentStatus = msg.Status
-	case SetStatusMsg:
+		s.statusType = msg.Type
+	case SetStatusMessage:
 		s.msg = msg.Msg
 		s.statusMsgType = msg.Type
 	case ClearStatusMsg:
@@ -67,7 +81,11 @@ func (s *StatusView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (s *StatusView) View() string {
-	views := []string{statusStyle.Render(s.currentStatus)}
+	statusColor, ok := statusTypeColorMap[s.statusType]
+	if !ok {
+		statusColor = lipgloss.Color("#ffffff")
+	}
+	views := []string{statusStyle.Background(statusColor).Render(s.currentStatus)}
 	if s.msg != "" {
 		views = append(views, msgStylesMap[s.statusMsgType].Render(s.msg))
 	}
