@@ -1,0 +1,29 @@
+builds:
+  - binary: jordi
+    main: ./cmd/jordi
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -X github.com/profx5/jordi/internal/version.Version={{.Version}}
+
+archives:
+  - format: tar.gz
+    replacements:
+      amd64: x86_64
+      darwin: osx
+    files:
+      - LICENSE
+
+brews:
+  - homepage: 'https://github.com/rnesytov/jordi/'
+    description: 'Terminal based gRPC client'
+    license: "MIT"
+    commit_author:
+      name: Roman Nesytov
+      email: rnesytov@gmail.com
+    tap:
+      owner: rnesytov
+      name: homebrew-jordi
