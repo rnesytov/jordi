@@ -150,11 +150,12 @@ func (r *RequestView) HandleWindowSize(msg tea.WindowSizeMsg) {
 }
 
 func (r *RequestView) SyncSize() {
-	r.inputView.SetHeight(r.height - helpHeight - titleHeight)
 	r.inputView.SetWidth(r.width)
 	r.help.SetWidth(r.width)
 
+	height := r.height - helpHeight - titleHeight
 	if r.showDesc {
-		r.inputView.SetHeight(r.height - helpHeight - countLines(r.inDesc) - 3)
+		height = height - helpHeight - countLines(r.inDesc) - 2
 	}
+	r.inputView.SetHeight(height)
 }
