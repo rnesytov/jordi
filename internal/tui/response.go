@@ -63,11 +63,11 @@ func (r *ResponseView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if key.Matches(msg, r.keyMap.resend) {
-			cmds = append(cmds, r.commands.Resend())
+			cmds = append(cmds, r.commands.ResendRequest())
 		}
 	case ShowResponseView:
 		cmds = append(cmds, r.waitForMsg(msg.ch))
-		cmds = append(cmds, r.commands.SetStatus("Sending", StatusTypeWarn))
+		cmds = append(cmds, r.commands.SetStatusLoading())
 	case ReceivedResponse:
 		r.view.SetValue(msg.Response)
 		cmds = append(cmds, r.waitForMsg(msg.ch))
@@ -77,13 +77,13 @@ func (r *ResponseView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			statusMsgType = StatusMsgSuccess
 		}
 		cmds = append(cmds, func() tea.Msg {
-			return SetStatusMessage{Msg: msg.Status, Type: statusMsgType}
+			return NewStatusMessage{Msg: msg.Status, Type: statusMsgType}
 		})
-		cmds = append(cmds, r.commands.SetStatus("Ready", StatusTypeOK))
+		cmds = append(cmds, r.commands.SetStatusOK())
 	case Back:
 		r.view.SetValue("")
 		cmds = append(cmds, r.commands.ClearStatusMsg())
-		cmds = append(cmds, r.commands.SetStatus("Ready", StatusTypeOK))
+		cmds = append(cmds, r.commands.SetStatusOK())
 	}
 	var cmd tea.Cmd
 	r.view, cmd = r.view.Update(msg)

@@ -34,6 +34,7 @@ type (
 		cc         *grpc.ClientConn
 		refClient  *grpcreflect.Client
 		descSource grpcurl.DescriptorSource
+		reqCancel  func()
 	}
 	TypeAndError[T any] struct {
 		Result T
@@ -51,8 +52,7 @@ type (
 		Err     error
 	}
 	gRPCEventHandler struct {
-		c      chan<- Event
-		cancel func()
+		c chan<- Event
 	}
 )
 
@@ -64,8 +64,6 @@ const (
 	ResponseReceived     gRPCEventType = iota
 	ReceivedTrailers     gRPCEventType = iota
 	EventError           gRPCEventType = iota
-
-	requestTimeout = 10 * time.Second // TODO: make this configurable
 )
 
 var (
@@ -135,6 +133,7 @@ func New(ctx context.Context, target string, connOpts Opts) (*Wrapper, error) {
 		cc:         clientConn,
 		refClient:  refClient,
 		descSource: descSource,
+		reqCancel:  nil,
 	}, nil
 }
 
@@ -211,8 +210,9 @@ func (g *Wrapper) Invoke(method string, request string) (<-chan Event, error) {
 	}
 	resultChan := make(chan Event, 10)
 
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-	h := &gRPCEventHandler{c: resultChan, cancel: cancel}
+	ctx, cancel := context.WithCancel(context.Background())
+	g.reqCancel = cancel
+	h := &gRPCEventHandler{c: resultChan}
 	go func() {
 		err := grpcurl.InvokeRPC(ctx, g.descSource, g.cc, method, []string{}, h, requestFormatter.Next)
 		if err != nil {
@@ -222,6 +222,18 @@ func (g *Wrapper) Invoke(method string, request string) (<-chan Event, error) {
 		}
 	}()
 	return resultChan, nil
+}
+
+func (g *Wrapper) CancelInvoke() {
+	if g.reqCancel != nil {
+		g.reqCancel()
+		g.reqCancel = nil
+	}
+}
+
+func (g *Wrapper) Close() {
+	g.refClient.Reset()
+	g.cc.Close()
 }
 
 func (h *gRPCEventHandler) OnResolveMethod(m *desc.MethodDescriptor) {
@@ -241,10 +253,4 @@ func (h *gRPCEventHandler) OnReceiveResponse(m proto.Message) {
 func (h *gRPCEventHandler) OnReceiveTrailers(s *status.Status, md metadata.MD) {
 	h.c <- Event{Type: ReceivedTrailers, Payload: s.Code().String()}
 	close(h.c)
-	h.cancel()
-}
-
-func (g *Wrapper) Close() {
-	g.refClient.Reset()
-	g.cc.Close()
 }

@@ -14,8 +14,16 @@ func NewCommands(grpc *grpc.Wrapper) *Commands {
 	return &Commands{grpc: grpc, cancel: make(chan struct{})}
 }
 
-func (c *Commands) LoadServices() tea.Cmd {
+func (c *Commands) Back() tea.Cmd {
 	return func() tea.Msg {
+		c.cancel <- struct{}{}
+		c.grpc.CancelInvoke()
+		return Back{}
+	}
+}
+
+func (c *Commands) LoadServices() tea.Cmd {
+	return tea.Batch(func() tea.Msg {
 		select {
 		case <-c.cancel:
 			return nil
@@ -25,11 +33,11 @@ func (c *Commands) LoadServices() tea.Cmd {
 			}
 			return ShowServicesList{Services: r.Result}
 		}
-	}
+	}, c.SetStatusLoading())
 }
 
 func (c *Commands) LoadMethods(service string) tea.Cmd {
-	return func() tea.Msg {
+	return tea.Batch(func() tea.Msg {
 		select {
 		case <-c.cancel:
 			return nil
@@ -37,13 +45,13 @@ func (c *Commands) LoadMethods(service string) tea.Cmd {
 			if r.Err != nil {
 				return Err{Error: r.Err}
 			}
-			return ShowMethodsList{Service: "", Methods: r.Result}
+			return ShowMethodsList{Service: service, Methods: r.Result}
 		}
-	}
+	}, c.SetStatusLoading())
 }
 
-func (c *Commands) ShowRequester(method string) tea.Cmd {
-	return func() tea.Msg {
+func (c *Commands) LoadMethodMetadata(method string) tea.Cmd {
+	return tea.Batch(func() tea.Msg {
 		select {
 		case <-c.cancel:
 			return nil
@@ -57,7 +65,7 @@ func (c *Commands) ShowRequester(method string) tea.Cmd {
 				InExample:     description.Example,
 			}
 		}
-	}
+	}, c.SetStatusLoading())
 }
 
 func mapRespChanToMsg(ch <-chan grpc.Event) <-chan tea.Msg {
@@ -98,15 +106,23 @@ func (c *Commands) SendRequest(method string, payload string) tea.Cmd {
 	}
 }
 
+func (c *Commands) SetStatusOK() tea.Cmd {
+	return c.SetStatus("Ready", StatusTypeOK)
+}
+
+func (c *Commands) SetStatusLoading() tea.Cmd {
+	return c.SetStatus("Loading", StatusTypeWarn)
+}
+
 func (c *Commands) SetStatus(status string, st StatusType) tea.Cmd {
 	return func() tea.Msg {
-		return SetStatus{Status: status, Type: st}
+		return NewStatus{Status: status, Type: st}
 	}
 }
 
 func (c *Commands) SetStatusMessage(msg string, st StatusMsgType) tea.Cmd {
 	return func() tea.Msg {
-		return SetStatusMessage{Msg: msg, Type: st}
+		return NewStatusMessage{Msg: msg, Type: st}
 	}
 }
 
@@ -116,7 +132,7 @@ func (c *Commands) ClearStatusMsg() tea.Cmd {
 	}
 }
 
-func (c *Commands) Resend() tea.Cmd {
+func (c *Commands) ResendRequest() tea.Cmd {
 	return func() tea.Msg {
 		return ResendRequest{}
 	}

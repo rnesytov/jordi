@@ -63,6 +63,7 @@ func (m *ServicesListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			items = append(items, ServicesListItem{Name: service})
 		}
 		cmds = append(cmds, m.view.SetItems(items))
+		cmds = append(cmds, m.commands.SetStatusOK())
 	}
 	var cmd tea.Cmd
 	m.view, cmd = m.view.Update(msg)

@@ -122,6 +122,7 @@ func (r *RequestView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		r.inputView.Focus()
 
 		r.title.SetTitle(getShortMethodName(msg.Method))
+		cmds = append(cmds, r.commands.SetStatusOK())
 	case ResendRequest:
 		return r, r.commands.SendRequest(r.method, r.inputView.Value())
 	}

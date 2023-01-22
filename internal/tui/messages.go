@@ -20,11 +20,11 @@ type (
 	Err struct {
 		Error error
 	}
-	SetStatus struct {
+	NewStatus struct {
 		Status string
 		Type   StatusType
 	}
-	SetStatusMessage struct {
+	NewStatusMessage struct {
 		Type StatusMsgType
 		Msg  string
 	}

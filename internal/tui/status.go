@@ -15,6 +15,8 @@ const (
 	StatusTypeOK    StatusType = iota
 	StatusTypeWarn  StatusType = iota
 	StatusTypeError StatusType = iota
+
+	statusMsgAddWidth = 8
 )
 
 var (
@@ -68,10 +70,10 @@ func (s *StatusView) Init() tea.Cmd {
 
 func (s *StatusView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case SetStatus:
+	case NewStatus:
 		s.currentStatus = msg.Status
 		s.statusType = msg.Type
-	case SetStatusMessage:
+	case NewStatusMessage:
 		s.msg = msg.Msg
 		s.statusMsgType = msg.Type
 	case ClearStatusMsg:
@@ -87,7 +89,12 @@ func (s *StatusView) View() string {
 	}
 	views := []string{statusStyle.Background(statusColor).Render(s.currentStatus)}
 	if s.msg != "" {
-		views = append(views, msgStylesMap[s.statusMsgType].Render(s.msg))
+		msg := s.msg
+		maxWidth := s.width - len(s.currentStatus) - statusMsgAddWidth
+		if maxWidth > 0 && len(msg) > maxWidth {
+			msg = msg[:maxWidth]
+		}
+		views = append(views, msgStylesMap[s.statusMsgType].Render(msg))
 	}
 
 	return statusBarStyle.Width(s.width).Render(

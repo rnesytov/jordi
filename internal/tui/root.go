@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -61,11 +59,10 @@ func (m *Root) Init() tea.Cmd {
 	cmds := []tea.Cmd{}
 	if m.initMethod != "" {
 		m.currentView = Request
-		cmds = append(cmds, m.commands.ShowRequester(m.initMethod))
+		cmds = append(cmds, m.commands.LoadMethodMetadata(m.initMethod))
 	} else {
 		cmds = append(cmds, m.commands.LoadServices())
 	}
-	cmds = append(cmds, m.commands.SetStatus("Ready", StatusTypeOK))
 	return tea.Batch(cmds...)
 }
 
@@ -108,7 +105,7 @@ func (m *Root) UpdateCurrentView(msg tea.Msg) tea.Cmd {
 func (m *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{}
 	switch msg := msg.(type) {
-	case SetStatus, SetStatusMessage, ClearStatusMsg:
+	case NewStatus, NewStatusMessage, ClearStatusMsg:
 		m.statusView.Update(msg)
 	case ShowServicesList:
 		m.currentView = Services
@@ -157,7 +154,5 @@ func (m *Root) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Root) View() string {
-	doc := strings.Builder{}
-	doc.WriteString(m.CurrentView().View())
 	return lipgloss.JoinVertical(lipgloss.Top, m.CurrentView().View(), m.statusView.View())
 }

@@ -65,15 +65,16 @@ func (m *MethodsListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keyMap.Enter) {
-			return m, m.commands.ShowRequester(m.view.SelectedItem().(MethodsListItem).Name)
+			return m, m.commands.LoadMethodMetadata(m.view.SelectedItem().(MethodsListItem).Name)
 		}
 	case ShowMethodsList:
+		m.view.Title = fmt.Sprintf("Methods of %s", msg.Service)
 		items := []list.Item{}
 		for _, methods := range msg.Methods {
 			items = append(items, NewMethodsListItem(methods))
 		}
-		m.view.SetItems(items)
-		m.view.Title = fmt.Sprintf("Methods %s", msg.Service)
+		cmds = append(cmds, m.view.SetItems(items))
+		cmds = append(cmds, m.commands.SetStatusOK())
 	}
 	var cmd tea.Cmd
 	m.view, cmd = m.view.Update(msg)
