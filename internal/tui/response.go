@@ -2,7 +2,7 @@ package tui
 
 import (
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -11,7 +11,7 @@ type (
 	ResponseView struct {
 		keyMap   ResponseKeyMap
 		commands *Commands
-		view     textarea.Model
+		view     viewport.Model
 		title    TitleView
 		help     HelpView
 	}
@@ -34,9 +34,7 @@ func (r ResponseKeyMap) Bindings() []key.Binding {
 }
 
 func NewResponseView(commands *Commands) *ResponseView {
-	view := textarea.New()
-	view.ShowLineNumbers = false
-	view.Prompt = ""
+	view := viewport.New(0, 0)
 
 	keyMap := DefaultResponseKeyMap()
 	return &ResponseView{
@@ -69,7 +67,7 @@ func (r *ResponseView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, r.waitForMsg(msg.ch))
 		cmds = append(cmds, r.commands.SetStatusLoading())
 	case ReceivedResponse:
-		r.view.SetValue(msg.Response)
+		r.view.SetContent(msg.Response)
 		cmds = append(cmds, r.waitForMsg(msg.ch))
 	case ReceivedStatus:
 		statusMsgType := StatusMsgError
@@ -81,7 +79,7 @@ func (r *ResponseView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		cmds = append(cmds, r.commands.SetStatusOK())
 	case Back:
-		r.view.SetValue("")
+		r.view.SetContent("")
 		cmds = append(cmds, r.commands.ClearStatusMsg())
 		cmds = append(cmds, r.commands.SetStatusOK())
 	}
@@ -96,7 +94,7 @@ func (r *ResponseView) View() string {
 }
 
 func (r *ResponseView) HandleWindowSize(msg tea.WindowSizeMsg) {
-	r.view.SetWidth(msg.Width)
-	r.view.SetHeight(msg.Height - helpHeight - titleHeight)
+	r.view.Width = msg.Width
+	r.view.Height = msg.Height - helpHeight - titleHeight
 	r.help.SetWidth(msg.Width)
 }
