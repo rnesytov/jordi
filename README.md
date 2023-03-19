@@ -71,9 +71,9 @@ It will display the request editor for the given method.
 - [x] Resend request in response view
 - [x] Nice titles for request/response
 - [x] Handle invalid JSON
+- [x] Store/load last successful request
 - [ ] Response headers
 - [ ] Handle long requests
-- [ ] Store/load last successful request
 - [ ] Request headers
 - [ ] Proto file definitions
 - [ ] Support most of grpcurl flags

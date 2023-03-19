@@ -3,15 +3,21 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/profx5/jordi/internal/grpc"
+	"github.com/profx5/jordi/internal/store"
 )
 
 type Commands struct {
 	cancel chan struct{}
 	grpc   *grpc.Wrapper
+	store  *store.Store
 }
 
-func NewCommands(grpc *grpc.Wrapper) *Commands {
-	return &Commands{grpc: grpc, cancel: make(chan struct{})}
+func NewCommands(grpc *grpc.Wrapper, store *store.Store) *Commands {
+	return &Commands{
+		grpc:   grpc,
+		cancel: make(chan struct{}),
+		store:  store,
+	}
 }
 
 func (c *Commands) Back() tea.Cmd {
@@ -59,10 +65,15 @@ func (c *Commands) LoadMethodMetadata(method string) tea.Cmd {
 			if description.Err != nil {
 				return Err{Error: description.Err}
 			}
+			example := description.Example
+			cached := c.store.Get(method)
+			if cached != nil {
+				example = cached.(string)
+			}
 			return ShowRequester{
 				Method:        method,
 				InDescription: description.Desc,
-				InExample:     description.Example,
+				InExample:     example,
 			}
 		}
 	}, c.SetStatusLoading())
@@ -102,6 +113,7 @@ func (c *Commands) SendRequest(method string, payload string) tea.Cmd {
 		if err != nil {
 			return Err{Error: err}
 		}
+		c.store.Set(method, payload)
 		return ShowResponseView{mapRespChanToMsg(ch)}
 	}
 }

@@ -35,6 +35,7 @@ type (
 		refClient  *grpcreflect.Client
 		descSource grpcurl.DescriptorSource
 		reqCancel  func()
+		Target     string
 	}
 	TypeAndError[T any] struct {
 		Result T
@@ -134,6 +135,7 @@ func New(ctx context.Context, target string, connOpts Opts) (*Wrapper, error) {
 		refClient:  refClient,
 		descSource: descSource,
 		reqCancel:  nil,
+		Target:     target,
 	}, nil
 }
 

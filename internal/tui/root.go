@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/profx5/jordi/internal/config"
 	"github.com/profx5/jordi/internal/grpc"
+	"github.com/profx5/jordi/internal/store"
 )
 
 type View int
@@ -37,8 +38,8 @@ type (
 	}
 )
 
-func NewRoot(config config.Config, grpc *grpc.Wrapper) *Root {
-	commands := NewCommands(grpc)
+func NewRoot(config config.Config, grpc *grpc.Wrapper, store *store.Store) *Root {
+	commands := NewCommands(grpc, store)
 	return &Root{
 		initMethod: config.Method,
 		keyMap: RootKeyMap{

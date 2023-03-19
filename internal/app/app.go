@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/profx5/jordi/internal/config"
 	"github.com/profx5/jordi/internal/grpc"
+	"github.com/profx5/jordi/internal/store"
 	"github.com/profx5/jordi/internal/tui"
 )
 
@@ -25,8 +26,10 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	defer grpcWrapper.Close()
+	store := store.New(grpcWrapper.Target)
+	defer store.Flush()
 
-	root := tui.NewRoot(a.config, grpcWrapper)
+	root := tui.NewRoot(a.config, grpcWrapper, store)
 
 	p := tea.NewProgram(root, tea.WithAltScreen(), tea.WithContext(ctx))
 	if _, err := p.Run(); err != nil {
