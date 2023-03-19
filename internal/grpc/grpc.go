@@ -238,7 +238,7 @@ func (g *Wrapper) Close() {
 	g.cc.Close()
 }
 
-func (h *gRPCEventHandler) OnResolveMethod(m *desc.MethodDescriptor) {
+func (h *gRPCEventHandler) OnResolveMethod(_ *desc.MethodDescriptor) {
 	h.c <- Event{Type: MethodResolved}
 }
 func (h *gRPCEventHandler) OnSendHeaders(metadata.MD) {
@@ -252,7 +252,7 @@ func (h *gRPCEventHandler) OnReceiveResponse(m proto.Message) {
 
 	h.c <- Event{Type: ResponseReceived, Payload: responseJSON, Err: err}
 }
-func (h *gRPCEventHandler) OnReceiveTrailers(s *status.Status, md metadata.MD) {
+func (h *gRPCEventHandler) OnReceiveTrailers(s *status.Status, _ metadata.MD) {
 	h.c <- Event{Type: ReceivedTrailers, Payload: s.Code().String()}
 	close(h.c)
 }
