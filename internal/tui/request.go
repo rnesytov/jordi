@@ -63,6 +63,7 @@ func DefaultRequestKeyMap() RequestKeyMap {
 func NewRequesterView(commands *Commands) *RequestView {
 	inputView := textarea.New()
 	inputView.ShowLineNumbers = false
+	inputView.CharLimit = 0
 	inputView.Prompt = ""
 
 	keyMap := DefaultRequestKeyMap()
